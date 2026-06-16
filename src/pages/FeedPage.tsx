@@ -26,65 +26,98 @@ export default function FeedPage() {
     if (!user) return;
     setLoading(true);
 
-    // Get following list
-    const { data: followData } = await supabase
-      .from("follows")
-      .select("following_id")
-      .eq("follower_id", user.id);
+    try {
+      // Get following list
+      const { data: followData } = await supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", user.id);
 
-    const followingIds = followData?.map((f) => f.following_id) || [];
+      const followingIds = followData?.map((f) => f.following_id) || [];
 
-    // Get joined communities
-    const { data: memberData } = await supabase
-      .from("community_members")
-      .select("community_id")
-      .eq("user_id", user.id);
+      // Get joined communities
+      const { data: memberData } = await supabase
+        .from("community_members")
+        .select("community_id")
+        .eq("user_id", user.id);
 
-    const communityIds = memberData?.map((m) => m.community_id) || [];
+      const communityIds = memberData?.map((m) => m.community_id) || [];
 
-    const authorIds = [...new Set([...followingIds, user.id])];
-    const filters: string[] = [];
+      // Build filter conditions
+      const authorIds = [...new Set([...followingIds, user.id])];
+      let filterCondition = "";
 
-    if (authorIds.length > 0) {
-      filters.push(`author_id.in.(${authorIds.join(",")})`);
+      if (authorIds.length > 0) {
+        filterCondition += `author_id.in.(${authorIds.join(",")})`;
+      }
+      if (communityIds.length > 0) {
+        if (filterCondition) {
+          filterCondition += ",";
+        }
+        filterCondition += `community_id.in.(${communityIds.join(",")})`;
+      }
+
+      let query = supabase
+        .from("posts")
+        .select("*, author:author_id(id,username,display_name,avatar_url), likes(post_id), comments(id), communities(id,title,image_url)")
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      // Apply filters if they exist
+      if (filterCondition) {
+        query = query.or(filterCondition);
+      }
+
+      const { data: feedData, error } = await query;
+
+      if (error) {
+        console.error("Feed fetch error:", error);
+        setPosts([]);
+      } else {
+        const postsResult = (feedData as any[]) || [];
+        // Transform data to match PostWithAuthor type
+        const transformedPosts = postsResult.map((post: any) => ({
+          ...post,
+          profiles: post.author,
+        }));
+        const uniquePosts = transformedPosts.filter(
+          (post, index, self) => self.findIndex((p) => p.id === post.id) === index
+        );
+        setPosts(uniquePosts);
+      }
+    } catch (error) {
+      console.error("Feed error:", error);
+      setPosts([]);
+    } finally {
+      setLoading(false);
     }
-    if (communityIds.length > 0) {
-      filters.push(`community_id.in.(${communityIds.join(",")})`);
-    }
-
-    const query = supabase
-      .from("posts")
-      .select("*, profiles(*), likes(*), comments(*), communities(*)")
-      .order("created_at", { ascending: false })
-      .limit(30);
-
-    if (filters.length > 0) {
-      query.or(filters.join(","));
-    }
-
-    const { data: feedData } = await query;
-
-    const postsResult = (feedData as PostWithAuthor[]) || [];
-    const uniquePosts = postsResult.filter(
-      (post, index, self) => self.findIndex((p) => p.id === post.id) === index
-    );
-
-    setPosts(uniquePosts);
-    setLoading(false);
   }, [user]);
 
   const fetchTrending = useCallback(async () => {
-    const { data } = await supabase
-      .from("posts")
-      .select("*, profiles(*), likes(*), comments(*), communities(*)")
-      .order("created_at", { ascending: false })
-      .limit(20);
+    try {
+      const { data, error } = await supabase
+        .from("posts")
+        .select("*, author:author_id(id,username,display_name,avatar_url), likes(post_id), comments(id), communities(id,title,image_url)")
+        .order("created_at", { ascending: false })
+        .limit(20);
 
-    if (data) {
-      const sorted = (data as PostWithAuthor[]).sort(
-        (a, b) => b.likes.length - a.likes.length
-      );
-      setTrendingPosts(sorted);
+      if (error) {
+        console.error("Trending fetch error:", error);
+        setTrendingPosts([]);
+      } else if (data) {
+        // Transform data to match PostWithAuthor type
+        const transformedPosts = (data as any[]).map((post: any) => ({
+          ...post,
+          profiles: post.author,
+        }));
+        const sorted = transformedPosts.sort(
+          (a, b) => (b.likes?.length || 0) - (a.likes?.length || 0)
+        );
+        setTrendingPosts(sorted);
+      }
+    } catch (error) {
+      console.error("Trending error:", error);
+      setTrendingPosts([]);
     }
   }, []);
 
