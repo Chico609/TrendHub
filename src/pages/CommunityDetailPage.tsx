@@ -59,31 +59,48 @@ export default function CommunityDetailPage() {
       if (!id || !user) return;
       setLoading(true);
 
-      const [{ data: commData }, { data: postsData }, { count }, { data: memberData }] =
-        await Promise.all([
-          supabase.from("communities").select("*").eq("id", id).single(),
-          supabase
-            .from("posts")
-            .select("*, profiles(*), likes(*), comments(*), communities(*)")
-            .eq("community_id", id)
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("community_members")
-            .select("*", { count: "exact", head: true })
-            .eq("community_id", id),
-          supabase
-            .from("community_members")
-            .select("user_id")
-            .eq("community_id", id)
-            .eq("user_id", user.id)
-            .single(),
-        ]);
+      try {
+        const [{ data: commData }, { data: postsData, error: postsError }, { count }, { data: memberData }] =
+          await Promise.all([
+            supabase.from("communities").select("*").eq("id", id).single(),
+            supabase
+              .from("posts")
+              .select("*, author:author_id(id,username,display_name,avatar_url), likes(post_id), comments(id), communities(id,title,image_url)")
+              .eq("community_id", id)
+              .order("created_at", { ascending: false }),
+            supabase
+              .from("community_members")
+              .select("*", { count: "exact", head: true })
+              .eq("community_id", id),
+            supabase
+              .from("community_members")
+              .select("user_id")
+              .eq("community_id", id)
+              .eq("user_id", user.id)
+              .single(),
+          ]);
 
-      setCommunity(commData as Community);
-      setPosts((postsData as PostWithAuthor[]) || []);
-      setMemberCount(count || 0);
-      setIsJoined(!!memberData);
-      setLoading(false);
+        setCommunity(commData as Community);
+        
+        if (postsError) {
+          console.error("Posts fetch error:", postsError);
+          setPosts([]);
+        } else {
+          // Transform data to match PostWithAuthor type
+          const transformedPosts = (postsData as any[] || []).map((post: any) => ({
+            ...post,
+            profiles: post.author,
+          }));
+          setPosts(transformedPosts as PostWithAuthor[]);
+        }
+        
+        setMemberCount(count || 0);
+        setIsJoined(!!memberData);
+      } catch (error) {
+        console.error("Error loading community:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     load();
