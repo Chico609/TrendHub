@@ -48,18 +48,18 @@ export default function NotificationsPage() {
       if (myPostIds.length > 0) {
         const { data: likesData } = await supabase
           .from("likes")
-          .select("*, profiles(*), post_id, created_at")
+          .select("user_id, post_id, created_at, user:user_id(id,username,display_name,avatar_url)")
           .in("post_id", myPostIds)
           .neq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(10);
 
-        for (const like of (likesData as Array<{ user_id: string; profiles: Profile; post_id: string; created_at: string }>) || []) {
+        for (const like of (likesData as Array<{ user_id: string; user: Profile; post_id: string; created_at: string }>) || []) {
           const post = (myPosts || []).find((p) => (p as { id: string }).id === like.post_id) as { id: string; content: string } | undefined;
           notifs.push({
             id: `like-${like.user_id}-${like.post_id}`,
             type: "like",
-            actor: like.profiles,
+            actor: like.user,
             postContent: post?.content?.slice(0, 60) + "...",
             postId: like.post_id,
             createdAt: like.created_at,
@@ -69,17 +69,17 @@ export default function NotificationsPage() {
         // Recent comments on my posts
         const { data: commentsData } = await supabase
           .from("comments")
-          .select("*, profiles(*)")
+          .select("*, author:author_id(id,username,display_name,avatar_url)")
           .in("post_id", myPostIds)
           .neq("author_id", user.id)
           .order("created_at", { ascending: false })
           .limit(10);
 
-        for (const comment of (commentsData as Array<{ id: string; profiles: Profile; post_id: string; created_at: string }>) || []) {
+        for (const comment of (commentsData as Array<{ id: string; author: Profile; post_id: string; created_at: string }>) || []) {
           notifs.push({
             id: `comment-${comment.id}`,
             type: "comment",
-            actor: comment.profiles,
+            actor: comment.author,
             postId: comment.post_id,
             createdAt: comment.created_at,
           });

@@ -36,12 +36,16 @@ export function CommentsSection({ postId, onCountChange }: CommentsSectionProps)
     setFetching(true);
     const { data } = await supabase
       .from("comments")
-      .select("*, profiles(*)")
+      .select("*, author:author_id(id,username,display_name,avatar_url)")
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
 
     if (data) {
-      setComments(data as CommentWithAuthor[]);
+      const transformedComments = (data as any[]).map((comment: any) => ({
+        ...comment,
+        profiles: comment.author,
+      }));
+      setComments(transformedComments as CommentWithAuthor[]);
       onCountChange(data.length);
     }
     setFetching(false);
@@ -55,11 +59,15 @@ export function CommentsSection({ postId, onCountChange }: CommentsSectionProps)
     const { data, error } = await supabase
       .from("comments")
       .insert({ post_id: postId, author_id: user.id, content: text.trim() })
-      .select("*, profiles(*)")
+      .select("*, author:author_id(id,username,display_name,avatar_url)")
       .single();
 
     if (!error && data) {
-      setComments((prev) => [...prev, data as CommentWithAuthor]);
+      const transformedComment = {
+        ...data,
+        profiles: (data as any).author,
+      };
+      setComments((prev) => [...prev, transformedComment as CommentWithAuthor]);
       onCountChange(comments.length + 1);
       setText("");
     }

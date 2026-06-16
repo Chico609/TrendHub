@@ -33,15 +33,19 @@ export default function ExplorePage() {
       setPostsLoading(true);
       const { data } = await supabase
         .from("posts")
-        .select("*, profiles(*), likes(*), comments(*), communities(*)")
+        .select("*, author:author_id(id,username,display_name,avatar_url), likes(post_id), comments(id), communities(id,title,image_url)")
         .order("created_at", { ascending: false })
         .limit(20);
 
       if (data) {
-        const sorted = (data as PostWithAuthor[]).sort(
-          (a, b) => b.likes.length - a.likes.length
+        const transformedPosts = (data as any[]).map((post: any) => ({
+          ...post,
+          profiles: post.author,
+        }));
+        const sorted = transformedPosts.sort(
+          (a, b) => (b.likes?.length || 0) - (a.likes?.length || 0)
         );
-        setTrendingPosts(sorted);
+        setTrendingPosts(sorted as PostWithAuthor[]);
       }
       setPostsLoading(false);
     };

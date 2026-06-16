@@ -46,7 +46,7 @@ export default function ProfilePage() {
         supabase.from("profiles").select("*").eq("id", targetId).single(),
         supabase
           .from("posts")
-          .select("*, profiles(*), likes(*), comments(*), communities(*)")
+          .select("*, author:author_id(id,username,display_name,avatar_url), likes(post_id), comments(id), communities(id,title,image_url)")
           .eq("author_id", targetId)
           .order("created_at", { ascending: false }),
         supabase
@@ -60,7 +60,15 @@ export default function ProfilePage() {
       ]);
 
     setProfile(profileData as Profile);
-    setPosts((postsData as PostWithAuthor[]) || []);
+    if (postsData) {
+      const transformedPosts = (postsData as any[]).map((post: any) => ({
+        ...post,
+        profiles: post.author,
+      }));
+      setPosts(transformedPosts as PostWithAuthor[]);
+    } else {
+      setPosts([]);
+    }
     setFollowerCount(followers || 0);
     setFollowingCount(following || 0);
 
