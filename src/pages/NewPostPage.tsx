@@ -204,7 +204,30 @@ export default function NewPostPage() {
               />
             </div>
           )}
-
+            {/* Media URL input */}
+            {mediaType !== "none" && (
+              <div className="space-y-2">
+                <Label htmlFor="mediaUrl">
+                  URL da {mediaType === "image" ? "imagem" : "vídeo"}
+                </Label>
+                <Input
+                  id="mediaUrl"
+                  type="url"
+                  placeholder={
+                    mediaType === "image"
+                      ? "https://exemplo.com/imagem.jpg"
+                      : "https://youtube.com/watch?v=..."
+                  }
+                  value={mediaUrl}
+                  onChange={(e) => setMediaUrl(e.target.value)}
+                />
+                {mediaType === "video" && (
+                  <p className="text-xs text-slate-400">
+                    💡 Dicas: Cole a URL do YouTube (youtube.com/watch?v=...), Vimeo (vimeo.com/...), ou qualquer vídeo MP4
+                  </p>
+                )}
+              </div>
+            )}
           {/* Community selector */}
           <div className="space-y-2">
             <Label>Comunidade (opcional)</Label>
